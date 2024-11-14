@@ -267,3 +267,171 @@ Let's see more understandable values with properties;
 # 1632210130000     Partition:0    key          Hello Huseyin
 # 1632210130000     Partition:1    null         Hello World
 ```
+
+
+## Consumer Groups
+> [Code](./resources/3-kafka-console-consumer-in-groups.sh)
+In this section, we will see all group members will get the same message.
+
+```bash
+./kafka-topics.sh \
+--bootstrap-server localhost:9092 \
+--create \
+--topic test-topic-group \
+--config ./../config/server.properties \
+--partitions 3 \
+```
+
+```bash
+./kafka-console-consumer.sh \
+--consumer.config ./../config/server.properties \
+--bootstrap-server localhost:9092 \
+--topic test-topic-group \
+--group test-group
+```
+
+In the other terminal;
+
+```bash
+./kafka-console-producer.sh \
+--producer.config ./../config/server.properties \
+--broker-list localhost:9092 \
+--topic test-topic-group
+--producer-property partitioner.class=org.apache.kafka.clients.producer.RoundRobinPartitioner
+# We want to seperate the messages to the partitions.
+> Hello World
+> Hello World 2
+> Hello World 3
+```
+
+We will see the messages in the consumer terminal.
+Let's add more consumers to the group.
+
+```bash
+./kafka-console-consumer.sh \
+--consumer.config ./../config/server.properties \
+--bootstrap-server localhost:9092 \
+--topic test-topic-group \
+--group test-group
+# We won't see any message because the first consumer read all the messages.
+```
+
+Continue to produce messages;
+
+```bash
+> Hello World 4
+> Hello World 5
+> Hello World 6
+```
+
+We will see the messages seperately in the consumers. Because partitions are assigned to the consumers seperately.
+
+Consumer 1;
+Hello World 4
+Hello World 5
+
+Consumer 2;
+Hello World 6
+
+
+If we open consumers more than the partition number, some consumers will be idle. Because there are no partitions to assign to them.
+When we open new consumers, they will be assigned to the partitions. When we close the consumers, partitions will be assigned to the other consumers.
+
+
+When we use --from-beginning, we will see all the messages 1 time. When we called the command again, we won't see any message because we read all the messages by group. 
+It was working with only one consumer. Because every new consumer get a different group id by created by Kafka.
+
+
+## Kafka Consumer Group Management
+> [Code](./resources/4-kafka-consumer-groups.sh)
+
+We can list, describe, delete the consumer groups with this command.
+Also, we can reset the offsets of the consumer groups.
+Also, we can connect to the topic with the consumer group.
+
+```bash
+./kafka-consumer-groups.sh
+# We will see the usable commands
+
+# We can list the consumer groups
+./kafka-consumer-groups.sh \
+--bootstrap-server localhost:9092 \
+--list
+
+
+# We can describe the consumer group
+./kafka-consumer-groups.sh \
+--bootstrap-server localhost:9092 \
+--describe \
+--group test-group
+
+# We will get group name, topic name, partition, current offset, log end offset, lag, consumer id, host, client id
+# current offset is the last read offset
+# log end offset is the last message offset
+# lag is the difference between the current offset and the log end offset
+```
+
+When we consume without group;
+Kafka will open a new group for the consumer. We can see the group name with the command.
+
+```bash
+./kafka-consumer-groups.sh \
+--bootstrap-server localhost:9092 \
+--list
+# test-group
+# console-consumer-12345
+# console-consumer-12345 is the group name for the consumer.
+```
+
+
+## Kafka Consumer Group Reset Offsets
+> [Code](./resources/5-reset-offsets.sh)
+We can reset the offsets of the consumer groups with this command.
+
+Simulation Mode;
+
+```bash
+./kafka-consumer-groups.sh \
+--bootstrap-server localhost:9092 \
+--group test-group \
+--topic test-topic-group \
+--reset-offsets \
+--to-earliest \
+--dry-run
+```
+
+When we run this command, we will see the simulation of the reset. We won't reset the offsets.
+
+Real Mode;
+
+```bash
+./kafka-consumer-groups.sh \
+--bootstrap-server localhost:9092 \
+--group test-group \
+--topic test-topic-group \
+--reset-offsets \
+--to-earliest \
+--execute
+```
+
+When we run this command, we will reset the offsets of the consumer group. We will see the messages from the beginning.
+
+Also, we can set the offsets with manual values.
+
+```bash
+./kafka-consumer-groups.sh \
+--bootstrap-server localhost:9092 \
+--group test-group \
+--topic test-topic-group \
+--reset-offsets \
+--to-offset 0 # move the offset to the 0th message \
+# or
+--to-latest # move the offset to the latest message \
+# or
+--shift-by 2 # move the offset 2 steps forward \
+# or
+--shift-by -2 # move the offset 2 steps back \
+# or
+--to-date 2021-09-21T00:00:00.000Z # move the offset to the date \
+--execute
+```
