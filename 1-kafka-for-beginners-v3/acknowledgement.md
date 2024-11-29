@@ -5,7 +5,7 @@ If it is set to 0, the producer will not wait for the leader broker to acknowled
 The default is `1` in v1.0 to v2.8
 
 The default is `all` in v3.0+ (`-1` is same as `all`)
-We can change the minimum number of in-sync replicas using the `min.insync.replicas` parameter. The default is `1`.
+We can change the minimum number of in-sync replicas using the `min.insync.replicas` parameter. The default is `1`. This uses for the `acks=all` configuration. If we set it to `2`, the producer will wait for at least 2 in-sync replicas to acknowledge the message.
 
 
 The most popular configuration is `acks=all` and `min.insync.replicas=2`. This option helps to durability and avalialability.
