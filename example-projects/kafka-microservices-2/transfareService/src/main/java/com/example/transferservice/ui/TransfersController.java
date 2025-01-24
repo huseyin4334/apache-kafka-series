@@ -23,6 +23,6 @@ public class TransfersController {
 
     @PostMapping()
     public boolean transfer(@RequestBody TransferRestModel transferRestModel) {
-        return transferService.transfer(transferRestModel);
+        return transferService.transferV2(transferRestModel);
     }
 }

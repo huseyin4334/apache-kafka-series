@@ -3,6 +3,7 @@ package com.example.transferservice;
 import java.util.HashMap;
 import java.util.Map;
 
+import jakarta.persistence.EntityManagerFactory;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,7 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.transaction.KafkaTransactionManager;
+import org.springframework.orm.jpa.JpaTransactionManager;
 
 @Configuration
 public class KafkaConfig {
@@ -77,6 +79,17 @@ public class KafkaConfig {
 	@Bean
 	KafkaTransactionManager<String, Object> kafkaTransactionManager() {
 		return new KafkaTransactionManager<>(producerFactory());
+	}
+
+	/*
+	 * JpaTransactionManager is used to manage transactions in JPA. It is used to commit or rollback transactions.
+	 * Normally, this bean is created by Spring Boot. But, we can create it manually.
+	 * When we create this bean manually, we should give it name "transactionManager". Because Spring Boot looks for a bean with this name.
+	 * If we create a transaction manager it won't create other 1. So, we should give it name "transactionManager".
+	 */
+	@Bean
+	JpaTransactionManager transactionManager(EntityManagerFactory entityManagerFactory) {
+		return new JpaTransactionManager(entityManagerFactory);
 	}
 
 	@Bean

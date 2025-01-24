@@ -1,7 +1,10 @@
 package com.example.transferservice.service;
 
+import com.example.transferservice.model.TransferEntity;
+import com.example.transferservice.repository.TransferRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -17,6 +20,7 @@ import com.example.core.events.DepositRequestedEvent;
 import com.example.core.events.WithdrawalRequestedEvent;
 
 import javax.naming.ServiceUnavailableException;
+import java.util.UUID;
 
 @Service
 public class TransferServiceImpl implements TransferService {
@@ -25,12 +29,14 @@ public class TransferServiceImpl implements TransferService {
 	private KafkaTemplate<String, Object> kafkaTemplate;
 	private Environment environment;
 	private RestTemplate restTemplate;
+	private TransferRepository transferRepository;
 
 	public TransferServiceImpl(KafkaTemplate<String, Object> kafkaTemplate, Environment environment,
-			RestTemplate restTemplate) {
+			RestTemplate restTemplate, TransferRepository transferRepository) {
 		this.kafkaTemplate = kafkaTemplate;
 		this.environment = environment;
 		this.restTemplate = restTemplate;
+		this.transferRepository = transferRepository;
 	}
 
 	/*
@@ -111,5 +117,79 @@ public class TransferServiceImpl implements TransferService {
 	 		- Because transaction is committed after the executeInTransaction method. (Scope is only for the method)
 
 	 */
+
+	/*
+	 	Database transactions and kafka transactions;
+	 	- Spring uses TransactionInterceptor to manage transactions.
+	 	- TransactionInterceptor is an AOP interceptor that wraps the method with a transaction.
+	 	- When we use @Transactional annotation, TransactionInterceptor wraps the method with a transaction.
+	 	- TransactionManager is an interface that has 2 implementations: JpaTransactionManager and KafkaTransactionManager.
+	 	- Bean names of them are "transactionManager" and "kafkaTransactionManager".
+
+	 	@Transactional(value = "kafkaTransactionManager")
+	 	void func() {
+	 		repository.save(...);
+	 		kafkaTemplate.send("topic", "message");
+	 		callRemoteService();
+	 		kafkaTemplate.send("topic", "message");
+	 	}
+
+	 	When we get an exception from the remote service, the kafka transaction will be rolled back.
+	 	But db transaction won't be rolled back. Because, kafka transaction manager and db transaction manager are different.
+	 	If we want to rollback db transaction, we should use @Transactional(value = "transactionManager") like this.
+
+	 	----------------------------------------------
+
+		@Transactional(value = "kafkaTransactionManager")
+	 	void func() {
+	 		callDbService();
+	 		kafkaTemplate.send("topic", "message");
+	 		callRemoteService();
+	 		kafkaTemplate.send("topic", "message");
+	 	}
+
+	 	@Transactional(value = "transactionManager")
+	 	void callDbService() {
+	 		// Call remote service
+	 	}
+
+	 	If we get an exception from the remote service, the kafka transaction will be rolled back. But db transaction won't be rolled back.
+	 	If we want to rollback db transaction, we should use @Transactional(value = "transactionManager") like this in the func() method.
+	 	Also we should delete @Transactional annotation from callDbService() method.
+	 */
+
+
+	@Transactional(value = "transactionManager", rollbackFor = TransferServiceException.class)
+	@Override
+	public boolean transferV2(TransferRestModel transferRestModel) {
+		WithdrawalRequestedEvent withdrawalEvent = new WithdrawalRequestedEvent(transferRestModel.getSenderId(),
+				transferRestModel.getRecepientId(), transferRestModel.getAmount());
+		DepositRequestedEvent depositEvent = new DepositRequestedEvent(transferRestModel.getSenderId(),
+				transferRestModel.getRecepientId(), transferRestModel.getAmount());
+
+		try {
+			// save to db
+			TransferEntity transferEntity = new TransferEntity();
+			BeanUtils.copyProperties(transferRestModel, transferEntity);
+			transferEntity.setTransferId(UUID.randomUUID().toString());
+			transferRepository.save(transferEntity);
+
+			kafkaTemplate.send(environment.getProperty("withdraw-money-topic", "withdraw-money-topic"),
+					withdrawalEvent);
+			LOGGER.info("Sent event to withdrawal topic.");
+
+			// Business logic that causes and error
+			callRemoteService();
+
+			kafkaTemplate.send(environment.getProperty("deposit-money-topic", "deposit-money-topic"), depositEvent);
+			LOGGER.info("Sent event to deposit topic");
+
+		} catch (Exception ex) {
+			LOGGER.error(ex.getMessage(), ex);
+			throw new TransferServiceException(ex);
+		}
+
+		return true;
+	}
 
 }
