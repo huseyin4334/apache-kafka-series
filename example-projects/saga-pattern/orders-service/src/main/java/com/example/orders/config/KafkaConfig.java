@@ -21,22 +21,4 @@ public class KafkaConfig {
         return new KafkaTemplate<>(producerFactory);
     }
     // KafkaTemplate < ProducerFactory < (ProducerConfig, KafkaProducer)
-
-
-    // Create Topics
-    @Bean
-    NewTopic orderCreatedTopic(@Value("events.orders.topic.name:order-created") String topicName) {
-        return TopicBuilder.name(topicName)
-                .partitions(partitions)
-                .replicas(replicationFactor)
-                .build();
-    }
-
-    @Bean
-    NewTopic productReserveCommandTopic(@Value("commands.products.topic.name:product-reservation-command") String topicName) {
-        return TopicBuilder.name(topicName)
-                .partitions(partitions)
-                .replicas(replicationFactor)
-                .build();
-    }
 }

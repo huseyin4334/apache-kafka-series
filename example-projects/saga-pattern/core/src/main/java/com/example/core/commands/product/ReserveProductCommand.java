@@ -1,4 +1,4 @@
-package com.example.core.commands;
+package com.example.core.commands.product;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

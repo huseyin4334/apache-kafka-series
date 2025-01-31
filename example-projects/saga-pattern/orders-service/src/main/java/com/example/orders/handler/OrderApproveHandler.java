@@ -1,6 +1,6 @@
 package com.example.orders.handler;
 
-import com.example.core.commands.OrderApproveCommand;
+import com.example.core.commands.order.OrderApproveCommand;
 import com.example.core.events.order.OrderApproveFailedEvent;
 import com.example.core.events.order.OrderApprovedEvent;
 import com.example.orders.service.OrderService;

@@ -1,8 +1,9 @@
 package com.example.orders.saga;
 
-import com.example.core.commands.OrderApproveCommand;
-import com.example.core.commands.ProcessPaymentCommand;
-import com.example.core.commands.ReserveProductCommand;
+import com.example.core.commands.order.OrderApproveCommand;
+import com.example.core.commands.payment.ProcessPaymentCommand;
+import com.example.core.commands.product.CancelReservationCommand;
+import com.example.core.commands.product.ReserveProductCommand;
 import com.example.core.events.order.OrderApproveFailedEvent;
 import com.example.core.events.order.OrderApprovedEvent;
 import com.example.core.events.order.OrderCreatedEvent;
@@ -11,7 +12,6 @@ import com.example.core.events.payment.PaymentProcessedEvent;
 import com.example.core.events.product.ProductReservationFailedEvent;
 import com.example.core.events.product.ProductReservedEvent;
 import com.example.core.types.OrderStatus;
-import com.example.orders.dto.OrderHistory;
 import com.example.orders.service.OrderHistoryService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,28 +21,29 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
 @Slf4j
 @Component
 @KafkaListener(topics = {
-        "${events.orders.topic.name:order-created-event}",
-        "${events.products.topic.name:product-reserved-event}",
-        "${events.products.fail.topic.name:product-reservation-failed-event}",
-        "${events.payments.topic.name:payment-processed-event}",
-        "${events.payments.fail.topic.name:payment-failed-event}",
-        "${events.orders.approve.topic.name:order-approved-event}",
-        "${events.orders.approve.fail.topic.name:order-approve-failed-event}"
+        "${events.orders.topic.name}",
+        "${events.products.topic.name}",
+        "${events.products.fail.topic.name}",
+        "${events.payments.topic.name}",
+        "${events.payments.fail.topic.name}",
+        "${events.orders.approved.topic.name}",
+        "${events.orders.rejected.topic.name}"
 })
 public class OrderCreateSaga {
-    @Value("${commands.products.topic.name:product-reservation-command}")
+    @Value("${commands.products.topic.name}")
     private String productReservationCommandTopic;
 
-    @Value("${commands.payments.topic.name:process-payment-command}")
+    @Value("${commands.payments.topic.name}")
     private String processPaymentCommandTopic;
 
-    @Value("${commands.orders.topic.name:order-approve-command}")
+    @Value("${commands.orders.approve.topic.name}")
     private String orderApproveCommandTopic;
+
+    @Value("${commands.products.fail.topic.name}")
+    private String productReservationFailedCommandTopic;
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final OrderHistoryService orderHistoryService;
@@ -97,8 +98,12 @@ public class OrderCreateSaga {
 
     @KafkaHandler
     public void handlePaymentFailedEvent(@Payload PaymentProcessFailedEvent event) {
-        // TODO: Implement the logic to handle the PaymentProcessFailedEvent
         log.info("Payment failed event catch: {}", event);
+        kafkaTemplate.send(productReservationCommandTopic, new CancelReservationCommand(
+                event.getOrderId(),
+                event.getProductId(),
+                event.getProductQuantity()
+        ));
     }
 
     @KafkaHandler

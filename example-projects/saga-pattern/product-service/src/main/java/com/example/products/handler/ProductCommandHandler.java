@@ -1,6 +1,7 @@
 package com.example.products.handler;
 
-import com.example.core.commands.ReserveProductCommand;
+import com.example.core.commands.product.CancelReservationCommand;
+import com.example.core.commands.product.ReserveProductCommand;
 import com.example.core.dto.Product;
 import com.example.core.events.product.ProductReservationFailedEvent;
 import com.example.core.events.product.ProductReservedEvent;
@@ -16,13 +17,13 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @KafkaListener(topics = {
-        "${commands.products.topic.name:product-reservation-command}"
+        "${commands.products.topic.name}"
 })
 public class ProductCommandHandler {
-    @Value("${events.products.topic.name:product-reserved-event}")
+    @Value("${events.products.topic.name}")
     private String productReservedEventTopic;
 
-    @Value("${events.products.fail.topic.name:product-reservation-failed-event}")
+    @Value("${events.products.fail.topic.name}")
     private String productReservationFailedEventTopic;
 
     private final ProductService productService;
@@ -54,6 +55,16 @@ public class ProductCommandHandler {
                     command.getProductId(),
                     command.getQuantity()
             ));
+        }
+    }
+
+    @KafkaHandler
+    public void handleCancelReservationProductCommand(@Payload CancelReservationCommand command) {
+        try {
+            Product product = new Product(command.getProductId(), command.getQuantity());
+            productService.cancelReservation(product, command.getOrderId());
+        } catch (Exception ex) {
+            log.error("Error processing CancelReservationCommand", ex);
         }
     }
 }

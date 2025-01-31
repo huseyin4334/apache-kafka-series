@@ -1,6 +1,6 @@
 package com.example.payments.handler;
 
-import com.example.core.commands.ProcessPaymentCommand;
+import com.example.core.commands.payment.ProcessPaymentCommand;
 import com.example.core.dto.Payment;
 import com.example.core.events.payment.PaymentProcessFailedEvent;
 import com.example.core.events.payment.PaymentProcessedEvent;
@@ -15,13 +15,13 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@KafkaListener(topics = "${commands.payments.topic.name:payment-process-command}")
+@KafkaListener(topics = "${commands.payments.topic.name}")
 public class PaymentProcessHandler {
 
-    @Value("${events.payments.topic.name:payment-processed-event}")
+    @Value("${events.payments.topic.name}")
     private String paymentProcessedEventTopic;
 
-    @Value("${events.payments.fail.topic.name:payment-failed-event}")
+    @Value("${events.payments.fail.topic.name}")
     private String paymentFailedEventTopic;
 
     private final PaymentService paymentService;
